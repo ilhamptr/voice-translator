@@ -1,0 +1,149 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Audio Recorder & Translator</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            height: 100vh;
+            background: linear-gradient(135deg, #667eea, #764ba2);
+            color: white;
+            text-align: center;
+        }
+        .container {
+            background: rgba(255, 255, 255, 0.2);
+            padding: 20px;
+            border-radius: 10px;
+            box-shadow: 0 4px 10px rgba(0, 0, 0, 0.2);
+        }
+        button, select {
+            background: #ff4757;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            margin: 10px;
+            border-radius: 5px;
+            cursor: pointer;
+        }
+        button:hover {
+            background: #e84118;
+        }
+        .output {
+            margin-top: 20px;
+            font-size: 18px;
+            font-weight: bold;
+        }
+        .loading {
+            display: none;
+            margin-top: 20px;
+            font-size: 18px;
+        }
+        .loading::after {
+            content: " ";
+            display: inline-block;
+            width: 24px;
+            height: 24px;
+            border: 4px solid white;
+            border-top: 4px solid transparent;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+        }
+        @keyframes spin {
+            from { transform: rotate(0deg); }
+            to { transform: rotate(360deg); }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h2>Audio Recorder & Translator</h2>
+        <label for="lang-from">From:</label>
+        <select id="lang-from">
+            <option value="auto" selected>Auto</option>
+            <option value="en">English</option>
+            <option value="es">Spanish</option>
+            <option value="fr">French</option>
+            <option value="de">German</option>
+        </select>
+        <label for="lang-to">To:</label>
+        <select id="lang-to">
+            <option value="en" selected>English</option>
+            <option value="es">Spanish</option>
+            <option value="fr">French</option>
+            <option value="de">German</option>
+        </select>
+        <br>
+        <button id="record">🎤 Record</button>
+        <button id="stop" disabled>⏹ Stop</button>
+        <p class="loading" id="loading">Processing...</p>
+        <p class="output" id="upload-result">Upload result will appear here...</p>
+        <p class="output" id="original-text"></p>
+        <p class="output" id="translated-text"></p>
+        <audio id="audio-player" controls hidden></audio>
+    </div>
+
+    <script>
+        let mediaRecorder;
+        let audioChunks = [];
+
+        document.getElementById("record").addEventListener("click", async () => {
+            let stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+            mediaRecorder = new MediaRecorder(stream);
+            audioChunks = [];
+            mediaRecorder.ondataavailable = event => {
+                audioChunks.push(event.data);
+            };
+
+            mediaRecorder.onstop = async () => {
+                let audioBlob = new Blob(audioChunks, { type: "audio/wav" });
+                let formData = new FormData();
+                formData.append("audio", audioBlob, "recorded_audio.wav");
+
+                let langFrom = document.getElementById("lang-from").value;
+                let langTo = document.getElementById("lang-to").value;
+                let loading = document.getElementById("loading");
+                loading.style.display = "inline-block"; // Show loading animation
+
+                try {
+                    let response = await fetch(`/upload/${langFrom}/${langTo}`, {
+                        method: "POST",
+                        body: formData
+                    });
+
+                    let result = await response.json();
+                    document.getElementById("upload-result").innerText = "Transcription: " + result.message;
+                    document.getElementById("original-text").innerText = "Original: " + result.original_text;
+                    document.getElementById("translated-text").innerText = "Translated: " + result.translated_text;
+
+                    let audioPlayer = document.getElementById("audio-player");
+                    audioPlayer.src = result.file_path; 
+                    console.log(audioPlayer.src)
+                    audioPlayer.hidden = false;
+                    audioPlayer.load(); 
+                } catch (error) {
+                    console.error("Upload failed:", error);
+                    document.getElementById("upload-result").innerText = "Upload failed!";
+                } finally {
+                    loading.style.display = "none"; // Hide loading animation
+                }
+            };
+
+            mediaRecorder.start();
+            document.getElementById("record").disabled = true;
+            document.getElementById("stop").disabled = false;
+        });
+
+        document.getElementById("stop").addEventListener("click", () => {
+            mediaRecorder.stop();
+            document.getElementById("record").disabled = false;
+            document.getElementById("stop").disabled = true;
+        });
+    </script>
+</body>
+</html>
