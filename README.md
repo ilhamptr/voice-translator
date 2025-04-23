@@ -86,7 +86,6 @@ This is a web-based application that allows users to record audio, transcribe th
 - Serves the recorded audio file for playback.
 
 ## Known Issues & Limitations
-- PythonAnywhere may have **file storage and request size limitations**.
 - Browser compatibility issues with MediaRecorder API (works best on Chrome & Edge).
 - Only supports selected languages in the translation dropdown.
 
